@@ -44,7 +44,8 @@
 #define MAGIC_COOKIE		0x63825363
 #define MAX_DHCP_OPT	16
 
-#define HOST_NAME "ENC28J"
+
+#define HOST_NAME_DEFAULT_PREFIX "ENC28J"
 #define DEFAULT_LEASE	(900) //default lease time in seconds
 #define DHCP_TIMEOUT            60000
 #define DHCP_RESPONSE_TIMEOUT   4000
@@ -155,6 +156,7 @@ private:
   uint32_t _dhcpInitialTransactionId;
   uint32_t _dhcpTransactionId;
   uint8_t  _dhcpMacAddr[6];
+  char * _hostname;
   TIPV4Struct _dhcpipv4struct;
   uint32_t _dhcpLeaseTime;
   uint32_t _dhcpT1, _dhcpT2;
@@ -173,6 +175,7 @@ private:
   
   uint8_t parseDHCPResponse(uint32_t& transactionId);
 public:
+  DhcpClass();
   IPAddress getLocalIp(void);
   IPAddress getSubnetMask(void);
   IPAddress getGatewayIp(void);
@@ -180,6 +183,7 @@ public:
   IPAddress getDnsServerIp(void);
   
   int beginWithDHCP(uint8_t *);
+  int beginWithDHCP(uint8_t *mac, char * hostname);
   int checkLease(void);
 };
 #endif

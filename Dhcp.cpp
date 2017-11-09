@@ -17,7 +17,28 @@
 #include "utility/logging.h"
 #include "utility/uip.h"
 
-int DhcpClass::beginWithDHCP(uint8_t *mac)
+DhcpClass::DhcpClass() : 
+	_hostname(NULL)
+{
+}
+
+int DhcpClass::beginWithDHCP(uint8_t *mac) {
+	// Default hostname is ENC28J + last 3 bytes of mac address in hex
+	uint8_t hostname_length = strlen(HOST_NAME_DEFAULT_PREFIX) + 6;
+	char * buffer = (char *)malloc(hostname_length + 1); // extra null-terminator byte!
+	memset(buffer, 0, hostname_length + 1);
+	strcpy(buffer, HOST_NAME_DEFAULT_PREFIX);
+
+    printByte((char*)&(buffer[hostname_length-6]), mac[3]);
+    printByte((char*)&(buffer[hostname_length-4]), mac[4]);
+    printByte((char*)&(buffer[hostname_length-2]), mac[5]);
+
+	int res = beginWithDHCP(mac, buffer);
+	free(buffer);
+	return res;
+}
+
+int DhcpClass::beginWithDHCP(uint8_t *mac, char * hostname)
 {
     #if ACTLOGLEVEL>=LOG_DEBUG_V1
       LogObject.uart_send_strln(F("DhcpClass::beginWithDHCP(uint8_t *mac) DEBUG_V1:Function started"));
@@ -27,13 +48,23 @@ int DhcpClass::beginWithDHCP(uint8_t *mac)
     _dhcpT2=0;
     _lastCheck=0;
 
+	// prepare the hostname
+	if (_hostname != NULL) {
+		free(_hostname);
+	}
+	_hostname = (char *)malloc(strlen(hostname) + 1);
+	strcpy(_hostname, hostname);
+
     // zero out _dhcpMacAddr
     memset(_dhcpMacAddr, 0, 6); 
     reset_DHCP_lease();
 
     memcpy((void*)_dhcpMacAddr, (void*)mac, 6);
     _dhcp_state = STATE_DHCP_START;
-    return request_DHCP_lease();
+    int res = request_DHCP_lease();
+	//free(_hostname);
+	//_hostname = NULL;
+	return res;
 }
 
 void DhcpClass::reset_DHCP_lease(void){
@@ -175,8 +206,9 @@ void DhcpClass::send_DHCP_MESSAGE(uint8_t messageType, uint16_t secondsElapsed)
     #if ACTLOGLEVEL>=LOG_DEBUG_V1
       LogObject.uart_send_strln(F("DhcpClass::send_DHCP_MESSAGE(uint8_t messageType, uint16_t secondsElapsed) DEBUG_V1:Function started"));
     #endif
-    uint8_t buffer[32];
-    memset(buffer, 0, 32);
+	uint8_t buffer_length = 18 + strlen(_hostname) + 2; // 2 extra bytes for good measure. The original code used 30 bytes but allocated 32...
+    uint8_t buffer[buffer_length];
+    memset(buffer, 0, buffer_length);
     IPAddress dest_addr( 255, 255, 255, 255 ); // Broadcast address
 
     if (-1 == _dhcpUdpSocket.beginPacket(dest_addr, DHCP_SERVER_PORT))
@@ -210,14 +242,14 @@ void DhcpClass::send_DHCP_MESSAGE(uint8_t messageType, uint16_t secondsElapsed)
     //put data in W5100 transmit buffer
     _dhcpUdpSocket.write(buffer, 28);
 
-    memset(buffer, 0, 32); // clear local buffer
+    memset(buffer, 0, buffer_length); // clear local buffer
 
     memcpy(buffer, _dhcpMacAddr, 6); // chaddr
 
     //put data in W5100 transmit buffer
     _dhcpUdpSocket.write(buffer, 16);
 
-    memset(buffer, 0, 32); // clear local buffer
+    memset(buffer, 0, buffer_length); // clear local buffer
 
     // leave zeroed out for sname && file
     // put in W5100 transmit buffer x 6 (192 bytes)
@@ -245,15 +277,11 @@ void DhcpClass::send_DHCP_MESSAGE(uint8_t messageType, uint16_t secondsElapsed)
 
     // OPT - host name
     buffer[16] = hostName;
-    buffer[17] = strlen(HOST_NAME) + 6; // length of hostname + last 3 bytes of mac address
-    strcpy((char*)&(buffer[18]), HOST_NAME);
-
-    printByte((char*)&(buffer[24]), _dhcpMacAddr[3]);
-    printByte((char*)&(buffer[26]), _dhcpMacAddr[4]);
-    printByte((char*)&(buffer[28]), _dhcpMacAddr[5]);
+    buffer[17] = strlen(_hostname); // length of hostname
+	memcpy(buffer+18, _hostname, strlen(_hostname));
 
     //put data in W5100 transmit buffer
-    _dhcpUdpSocket.write(buffer, 30);
+    _dhcpUdpSocket.write(buffer, 18 + strlen(_hostname));
 
     if(messageType == DHCP_REQUEST)
     {

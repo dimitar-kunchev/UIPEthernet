@@ -64,6 +64,12 @@ UIPEthernetClass::UIPEthernetClass()
 int
 UIPEthernetClass::begin(const uint8_t* mac)
 {
+  return begin(mac, NULL);
+}
+
+int
+UIPEthernetClass::begin(const uint8_t* mac, char * hostname)
+{
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("UIPEthernetClass::begin(const uint8_t* mac) DEBUG_V3:Function started"));
   #endif
@@ -74,7 +80,12 @@ UIPEthernetClass::begin(const uint8_t* mac)
   init(mac);
 
   // Now try to get our config info from a DHCP server
-  int ret = _dhcp->beginWithDHCP((uint8_t*)mac);
+  int ret = 0;
+  if (hostname != NULL) {
+    ret = _dhcp->beginWithDHCP((uint8_t*)mac, hostname);
+  } else {
+    ret = _dhcp->beginWithDHCP((uint8_t*)mac);
+  }
   if(ret == 1)
   {
     // We've successfully found a DHCP server and got our configuration info, so set things
@@ -83,6 +94,9 @@ UIPEthernetClass::begin(const uint8_t* mac)
   }
   return ret;
 }
+
+
+
 #endif
 
 void

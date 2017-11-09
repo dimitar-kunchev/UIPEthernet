@@ -73,6 +73,7 @@ public:
   UIPEthernetClass();
 
   int begin(const uint8_t* mac);
+  int begin(const uint8_t* mac, char * hostname);
   void begin(const uint8_t* mac, IPAddress ip);
   void begin(const uint8_t* mac, IPAddress ip, IPAddress dns);
   void begin(const uint8_t* mac, IPAddress ip, IPAddress dns, IPAddress gateway);
