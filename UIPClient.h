@@ -119,6 +119,7 @@ private:
 
   friend class UIPEthernetClass;
   friend class UIPServer;
+  friend class UIPClientExt;
 
   friend void uipclient_appcall(void);
 
