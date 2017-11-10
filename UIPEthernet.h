@@ -73,6 +73,7 @@ public:
   UIPEthernetClass();
 
   int begin(const uint8_t* mac);
+  // Note the hostname can have only the characters A-Z, a-z, 0-9 and dash.
   int begin(const uint8_t* mac, char * hostname);
   void begin(const uint8_t* mac, IPAddress ip);
   void begin(const uint8_t* mac, IPAddress ip, IPAddress dns);

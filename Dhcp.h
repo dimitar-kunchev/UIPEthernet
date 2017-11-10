@@ -183,6 +183,10 @@ public:
   IPAddress getDnsServerIp(void);
   
   int beginWithDHCP(uint8_t *);
+  /**
+   * Same as beginWithDHCP(uint8_t *) but allows you to specify a hostname other than the default ENCJ80 followed by the last 3 octets of the MAC address
+   * Note the hostname can have only the characters A-Z, a-z, 0-9 and dash.
+   */
   int beginWithDHCP(uint8_t *mac, char * hostname);
   int checkLease(void);
 };
