@@ -79,6 +79,9 @@ public:
   void begin(const uint8_t* mac, IPAddress ip, IPAddress dns);
   void begin(const uint8_t* mac, IPAddress ip, IPAddress dns, IPAddress gateway);
   void begin(const uint8_t* mac, IPAddress ip, IPAddress dns, IPAddress gateway, IPAddress subnet);
+#if UIP_ASYNC_DHCP
+  int checkDHCPInit();
+#endif
 
   // maintain() must be called at regular intervals to process the incoming serial
   // data and issue IP events to the sketch.  It does not return until all IP

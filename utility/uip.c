@@ -236,6 +236,13 @@ struct uip_stats uip_stat;
 #define UIP_STAT(s)
 #endif /* UIP_STATISTICS == 1 */
 
+#if UIP_SAVE_LAST_ICMP_ECHO_TIME == 1
+static unsigned long uip_last_icmp_echo_received = 0;
+#define UIP_SAVE_ICMP_ECHO_TIME(t) (t);
+#else
+#define UIP_SAVE_ICMP_ECHO_TIME(t)
+#endif
+
 #if UIP_LOGGING == 1
 #include <stdio.h>
 void uip_log(char *msg);
@@ -1009,6 +1016,7 @@ uip_process(u8_t flag)
   uip_ipaddr_copy(BUF->srcipaddr, uip_hostaddr);
 
   UIP_STAT(++uip_stat.icmp.sent);
+  UIP_SAVE_ICMP_ECHO_TIME(uip_last_icmp_echo_received=millis());
   goto send;
 
   /* End of IPv4 input header processing code. */
@@ -1897,4 +1905,12 @@ uip_send(const void *data, int len)
     }
   }
 }
+/*---------------------------------------------------------------------------*/
+#if UIP_SAVE_LAST_ICMP_ECHO_TIME == 1
+unsigned long uip_get_last_icmp_echo_time() {
+  return uip_last_icmp_echo_received;
+}
+#endif
+
 /** @} */
+

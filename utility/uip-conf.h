@@ -163,6 +163,23 @@ typedef unsigned short uip_stats_t;
  */
 #define UIP_CONF_STATISTICS      0
 
+
+/**
+ * uIP Save Last ICMP Echo Time
+ *
+ * \hideinitializer
+ */
+#define UIP_CONF_SAVE_LAST_ICMP_ECHO_TIME	1
+
+
+/**
+ * Switch to asynchronous DHCP
+ *
+ * \hideinitializer
+ */
+#define UIP_CONFG_ASYNC_DHCP	1
+
+
 // SLIP
 //#define UIP_CONF_LLH_LEN 0
 

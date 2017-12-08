@@ -275,7 +275,11 @@ int16_t DNSClient::ProcessResponse(uint16_t aTimeout, IPAddress& aAddress)
             return TIMED_OUT;
         delay(50);
     }
+	return ParseResponse(aAddress);
+}
 
+int16_t DNSClient::ParseResponse(IPAddress& aAddress)
+{
     // We've had a reply!
     // Read the UDP header
     uint8_t header[DNS_HEADER_SIZE]; // Enough space to reuse for the DNS header

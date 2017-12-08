@@ -130,7 +130,7 @@ int DhcpClass::request_DHCP_lease(void){
         else if(_dhcp_state == STATE_DHCP_DISCOVER)
         {
             uint32_t respId;
-            messageType = parseDHCPResponse(respId);
+            messageType = parseDHCPResponse(respId, false);
             if(messageType == DHCP_OFFER)
             {
                 #if ACTLOGLEVEL>=LOG_DEBUG_V1
@@ -146,7 +146,7 @@ int DhcpClass::request_DHCP_lease(void){
         else if(_dhcp_state == STATE_DHCP_REQUEST)
         {
             uint32_t respId;
-            messageType = parseDHCPResponse(respId);
+            messageType = parseDHCPResponse(respId, false);
             if(messageType == DHCP_ACK)
             {
                 #if ACTLOGLEVEL>=LOG_DEBUG_V1
@@ -319,23 +319,24 @@ void DhcpClass::send_DHCP_MESSAGE(uint8_t messageType, uint16_t secondsElapsed)
     _dhcpUdpSocket.endPacket();
 }
 
-uint8_t DhcpClass::parseDHCPResponse(uint32_t& transactionId)
+uint8_t DhcpClass::parseDHCPResponse(uint32_t& transactionId, bool async)
 {
     #if ACTLOGLEVEL>=LOG_DEBUG_V1
-      LogObject.uart_send_strln(F("DhcpClass::parseDHCPResponse(uint32_t& transactionId) DEBUG_V1:Function started"));
+      LogObject.uart_send_strln(F("DhcpClass::parseDHCPResponse(uint32_t& transactionId, bool async) DEBUG_V1:Function started"));
     #endif
     uint8_t type = 0;
     uint8_t opt_len = 0;
-     
-    unsigned long startTime = millis();
 
-    while(_dhcpUdpSocket.parsePacket() <= 0)
-    {
-        if((millis() - startTime) > DHCP_RESPONSE_TIMEOUT)
-        {
-            return 255;
-        }
-        delay(50);
+    if (!async) {
+    	unsigned long startTime = millis();
+    	while(_dhcpUdpSocket.parsePacket() <= 0)
+		{
+			if((millis() - startTime) > DHCP_RESPONSE_TIMEOUT)
+			{
+				return 255;
+			}
+			delay(50);
+		}
     }
     // start reading in the packet
     RIP_MSG_FIXED fixedMsg;
@@ -572,4 +573,322 @@ void DhcpClass::printByte(char * buf, uint8_t n ) {
     *str-- = c < 10 ? c + '0' : c + 'A' - 10;
   } while(n);
 }
+
+
+//--------//
+#if UIP_ASYNC_DHCP
+int DhcpClass::beginWithDHCPAsync(uint8_t *mac, char * hostname) {
+#if ACTLOGLEVEL>=LOG_DEBUG_V1
+      LogObject.uart_send_strln(F("DhcpClass::beginWithDHCPAsync(uint8_t *mac) DEBUG_V1:Function started"));
+    #endif
+    _dhcpLeaseTime=0;
+    _dhcpT1=0;
+    _dhcpT2=0;
+    _lastCheck=0;
+
+	// prepare the hostname
+	if (_hostname != NULL) {
+		free(_hostname);
+	}
+	_hostname = (char *)malloc(strlen(hostname) + 1);
+	strcpy(_hostname, hostname);
+
+    // zero out _dhcpMacAddr
+    memset(_dhcpMacAddr, 0, 6);
+    reset_DHCP_lease();
+
+    memcpy((void*)_dhcpMacAddr, (void*)mac, 6);
+    _dhcp_state = STATE_DHCP_START;
+    int res = request_DHCP_lease_async();
+	//free(_hostname);
+	//_hostname = NULL;
+	return res;
+}
+
+int DhcpClass::request_DHCP_lease_async(void){
+    #if ACTLOGLEVEL>=LOG_DEBUG_V1
+      LogObject.uart_send_strln(F("DhcpClass::request_DHCP_lease(void) DEBUG_V1:Function started"));
+    #endif
+
+    // Pick an initial transaction ID
+    #if defined(ARDUINO)
+       _dhcpTransactionId = random(1UL, 2000UL);
+    #endif
+    #if defined(__MBED__)
+       _dhcpTransactionId = (rand() % 2000UL) + 1;
+    #endif
+    _dhcpInitialTransactionId = _dhcpTransactionId;
+
+    _dhcpUdpSocket.stop();
+    if (_dhcpUdpSocket.begin(DHCP_CLIENT_PORT) == 0)
+    {
+      // Couldn't get a socket
+      return 0;
+    }
+
+    presend_DHCP();
+
+    _ra_startTime = millis();
+
+    return 1;
+}
+
+int DhcpClass::pollDHCPAsync(void){
+	#if ACTLOGLEVEL>=LOG_DEBUG_V1
+      LogObject.uart_send_strln(F("DhcpClass::pollDHCPAsync(void) DEBUG_V1:Function started"));
+    #endif
+	uint8_t messageType = 0;
+	int result = 0;
+
+	if(_dhcp_state == STATE_DHCP_START)
+	{
+		#if ACTLOGLEVEL>=LOG_DEBUG_V1
+		  LogObject.uart_send_strln(F("DhcpClass::pollDHCPAsync(void) DEBUG_V1:dhcp_state=STATE_DHCP_START -> send_DHCP_MESSAGE DHCP_DISCOVER"));
+		#endif
+		_dhcpTransactionId++;
+
+		send_DHCP_MESSAGE(DHCP_DISCOVER, ((millis() - _ra_startTime) / 1000));
+		_dhcp_state = STATE_DHCP_DISCOVER;
+		_ra_dhcp_request_startTime = millis();
+	}
+	else if(_dhcp_state == STATE_DHCP_REREQUEST){
+		#if ACTLOGLEVEL>=LOG_DEBUG_V1
+		  LogObject.uart_send_strln(F("DhcpClass::pollDHCPAsync(void) DEBUG_V1:dhcp_state=STATE_DHCP_REREQUEST -> send_DHCP_MESSAGE DHCP_REQUEST"));
+		#endif
+		_dhcpTransactionId++;
+		send_DHCP_MESSAGE(DHCP_REQUEST, ((millis() - _ra_startTime)/1000));
+		_dhcp_state = STATE_DHCP_REQUEST;
+		_ra_dhcp_request_startTime = millis();
+	}
+	else if(_dhcp_state == STATE_DHCP_DISCOVER)
+	{
+		uint32_t respId;
+		int ra = check_async_response_available();
+		if (ra == 1) {
+			messageType = parseDHCPResponse(respId, true);
+			if(messageType == DHCP_OFFER)
+			{
+				#if ACTLOGLEVEL>=LOG_DEBUG_V1
+				  LogObject.uart_send_strln(F("DhcpClass::pollDHCPAsync(void) DEBUG_V1:dhcp_state=STATE_DHCP_DISCOVER,messageType=DHCP_OFFER -> send_DHCP_MESSAGE DHCP_REQUEST"));
+				#endif
+				// We'll use the transaction ID that the offer came with,
+				// rather than the one we were up to
+				_dhcpTransactionId = respId;
+				send_DHCP_MESSAGE(DHCP_REQUEST, ((millis() - _ra_startTime) / 1000));
+				_dhcp_state = STATE_DHCP_REQUEST;
+			}
+		} else if (ra == 255) {
+			// timeout
+			messageType = ra;
+		}
+	}
+	else if(_dhcp_state == STATE_DHCP_REQUEST)
+	{
+		uint32_t respId;
+		int ra = check_async_response_available();
+		if (ra == 1) {
+			messageType = parseDHCPResponse(respId, true);
+
+			if(messageType == DHCP_ACK)
+			{
+				#if ACTLOGLEVEL>=LOG_DEBUG_V1
+				  LogObject.uart_send_strln(F("DhcpClass::pollDHCPAsync(void) DEBUG_V1:dhcp_state=STATE_DHCP_REQUEST,messageType=DHCP_ACK"));
+				#endif
+				_dhcp_state = STATE_DHCP_LEASED;
+				result = 1;
+				//use default lease time if we didn't get it
+				if(_dhcpLeaseTime == 0){
+					_dhcpLeaseTime = DEFAULT_LEASE;
+				}
+				//calculate T1 & T2 if we didn't get it
+				if(_dhcpT1 == 0){
+					//T1 should be 50% of _dhcpLeaseTime
+					_dhcpT1 = _dhcpLeaseTime >> 1;
+				}
+				if(_dhcpT2 == 0){
+					//T2 should be 87.5% (7/8ths) of _dhcpLeaseTime
+					_dhcpT2 = _dhcpT1 << 1;
+				}
+				_renewInSec = _dhcpT1;
+				_rebindInSec = _dhcpT2;
+
+				#if ACTLOGLEVEL>=LOG_DEBUG_V1
+				  LogObject.uart_send_str (F("DhcpClass DEBUG_V1 renew in "));
+				  LogObject.uart_send_str (_renewInSec);
+				  LogObject.uart_send_str (F(" rebind in "));
+				  LogObject.uart_send_strln (_rebindInSec);
+				#endif
+			}
+			else if(messageType == DHCP_NAK)
+				_dhcp_state = STATE_DHCP_START;
+		} else if (ra == 255) {
+			messageType = 255;
+		}
+	}
+
+	if(messageType == 255)
+	{
+		messageType = 0;
+		_dhcp_state = STATE_DHCP_START;
+	}
+
+	if (_dhcp_state == STATE_DHCP_LEASED) {
+		// end the async process and return OK
+		request_DHCP_lease_async_end();
+		return 1;
+	}
+
+	if(result != 1 && ((millis() - _ra_startTime) > DHCP_TIMEOUT)) {
+		// end the async process and return appropriate error
+		request_DHCP_lease_async_end();
+		return -1;
+	}
+
+	#if defined(ESP8266)
+       wdt_reset();
+    #endif
+
+    return 0;
+}
+
+int DhcpClass::request_DHCP_lease_async_end(void){
+   // We're done with the socket now
+   _dhcpUdpSocket.stop();
+   _dhcpTransactionId++;
+}
+
+int DhcpClass::check_async_response_available() {
+	if (_dhcpUdpSocket.parsePacket() <= 0) {
+		if((millis() - _ra_dhcp_request_startTime) > DHCP_RESPONSE_TIMEOUT) {
+			return 255;
+		}
+	} else {
+		return 1;
+	}
+	return 0;
+}
+
+/// Async lease check
+
+int DhcpClass::checkLease_async(void){
+    #if ACTLOGLEVEL>=LOG_DEBUG_V1
+      LogObject.uart_send_strln(F("DhcpClass::checkLease_async(void) DEBUG_V1:Function started"));
+    #endif
+
+    //this uses a signed / unsigned trick to deal with millis overflow
+
+    unsigned long now = millis();
+    signed long snow = (long)now;
+
+    if (_lease_check_async_state > 0) {
+		#if ACTLOGLEVEL>=LOG_DEBUG_V1
+			LogObject.uart_send_strln(F("DhcpClass - in renew/rebind"));
+		#endif
+    	/// we have started the process of renewal or rebinding! we are waiting for async result from request_DHCP_lease_async()
+    	// state is either STATE_DHCP_START or STATE_DHCP_REQUEST
+    	int rc = pollDHCPAsync();
+    	if (rc != 0) {
+    		// we are no longer waiting for result
+
+    		if (rc < 0) {
+    			// there was a problem. This is the point where we need to check if we need to rebind
+    			// is there anthing we should do here? The pollDHCPAsync functino will set the state to STATE_DHCP_START, rebind timeout will drop < 0 so
+    			// next call will enter the check for renew/rebind branch and start the rebind...
+    			if (_lease_check_async_state == 1) {
+					// We are renewing
+					rc = DHCP_CHECK_RENEW_FAIL;
+				}
+				if (_lease_check_async_state == 2) {
+					// We are rebinding
+					rc = DHCP_CHECK_REBIND_FAIL;
+				}
+    		} else {
+    			// all went well
+    			if (_lease_check_async_state == 1) {
+    				// We are renewing
+    				rc = DHCP_CHECK_RENEW_OK;
+    			}
+    			if (_lease_check_async_state == 2) {
+    				// We are rebinding
+    				rc = DHCP_CHECK_REBIND_OK;
+    			}
+    		}
+    		_lease_check_async_state = 0;
+    		_lastCheck = now;
+    	}
+		#if ACTLOGLEVEL>=LOG_DEBUG_V1
+			LogObject.uart_send_str(F("DhcpClass:checkLease_async() return "));
+			LogObject.uart_send_strln(rc);
+		#endif
+    	return rc;
+    } else {
+    	/// Do the normal check for renew/rebind, but call the async methods
+		#if ACTLOGLEVEL>=LOG_DEBUG_V1
+			LogObject.uart_send_strln(F("DhcpClass - check for renew/rebind"));
+		#endif
+        int rc=DHCP_CHECK_NONE;
+        if (_lastCheck != 0){
+            signed long factor;
+            //calc how many ms past the timeout we are
+            factor = snow - (long)_secTimeout;
+            //if on or passed the timeout, reduce the counters
+            if ( factor >= 0 ){
+                //next timeout should be now plus 1000 ms minus parts of second in factor
+                _secTimeout = snow + 1000 - factor % 1000;
+                //how many seconds late are we, minimum 1
+                factor = factor / 1000 +1;
+
+                //reduce the counters by that mouch
+                //if we can assume that the cycle time (factor) is fairly constant
+                //and if the remainder is less than cycle time * 2
+                //do it early instead of late
+                if(_renewInSec < factor*2 )
+                    _renewInSec = 0;
+                else
+                    _renewInSec -= factor;
+
+                if(_rebindInSec < factor*2 )
+                    _rebindInSec = 0;
+                else
+                    _rebindInSec -= factor;
+            }
+
+            //if we have a lease but should renew, do it
+            if (_dhcp_state == STATE_DHCP_LEASED && _renewInSec <=0){
+				#if ACTLOGLEVEL>=LOG_DEBUG_V1
+					LogObject.uart_send_strln(F("DhcpClass:checkLease_async() - must renew "));
+				#endif
+                _dhcp_state = STATE_DHCP_REREQUEST;
+                rc = 1 + request_DHCP_lease_async();
+                _lease_check_async_state = 1; // raise the flag for the next call to this method
+            }
+
+            //if we have a lease or is renewing but should bind, do it
+            if( (_dhcp_state == STATE_DHCP_LEASED || _dhcp_state == STATE_DHCP_START) && _rebindInSec <=0){
+                //this should basically restart completely
+				#if ACTLOGLEVEL>=LOG_DEBUG_V1
+					LogObject.uart_send_strln(F("DhcpClass:checkLease_async() - must rebind "));
+				#endif
+                _dhcp_state = STATE_DHCP_START;
+                reset_DHCP_lease();
+                rc = 3 + request_DHCP_lease_async();
+                _lease_check_async_state = 2; // raise the flag for the next call to this method
+            }
+        }
+        else{
+            _secTimeout = snow + 1000;
+        }
+
+        _lastCheck = now;
+		#if ACTLOGLEVEL>=LOG_DEBUG_V1
+			LogObject.uart_send_str(F("DhcpClass:checkLease_async() return "));
+			LogObject.uart_send_strln(rc);
+		#endif
+        return rc;
+    }
+
+}
+
+#endif
+
 #endif

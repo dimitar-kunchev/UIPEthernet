@@ -173,7 +173,14 @@ private:
   void send_DHCP_MESSAGE(uint8_t, uint16_t);
   void printByte(char *, uint8_t);
   
-  uint8_t parseDHCPResponse(uint32_t& transactionId);
+  uint8_t parseDHCPResponse(uint32_t& transactionId, bool async);
+
+#if UIP_ASYNC_DHCP
+  unsigned long _ra_startTime;
+  unsigned long _ra_dhcp_request_startTime;
+
+  byte _lease_check_async_state; // this is used by the checkLease_async method to keep track if it is already in a check
+#endif
 public:
   DhcpClass();
   IPAddress getLocalIp(void);
@@ -189,6 +196,18 @@ public:
    */
   int beginWithDHCP(uint8_t *mac, char * hostname);
   int checkLease(void);
+
+#if UIP_ASYNC_DHCP
+public:
+  int beginWithDHCPAsync(uint8_t *mac, char * hostname);
+  int pollDHCPAsync(void);
+  int checkLease_async();
+private:
+  int request_DHCP_lease_async(void);
+  int request_DHCP_lease_async_end(void);
+  int check_async_response_available();
+#endif
+
 };
 #endif
 #endif

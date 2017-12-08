@@ -206,6 +206,13 @@
 #define UIP_UDP_CONNS    10
 #endif /* UIP_CONF_UDP_CONNS */
 
+
+#ifdef UIP_CONFG_ASYNC_DHCP
+#define UIP_ASYNC_DHCP UIP_CONFG_ASYNC_DHCP
+#else
+#define UIP_ASYNC_DHCP 0
+#endif
+
 /**
  * The name of the function that should be called when UDP datagrams arrive.
  *
@@ -398,6 +405,21 @@
 #else /* UIP_CONF_STATISTICS */
 #define UIP_STATISTICS UIP_CONF_STATISTICS
 #endif /* UIP_CONF_STATISTICS */
+
+
+/**
+ * Determines if the last time icmp echo was received should be saved
+ * 
+ * Useful if you want to track when is the last time you got ping'ed
+ *
+ * \hideinitializer
+ */
+#ifndef UIP_CONF_SAVE_LAST_ICMP_ECHO_TIME
+#define UIP_SAVE_LAST_ICMP_ECHO_TIME 0
+#else /* UIP_CONF_SAVE_LAST_ICMP_ECHO_TIME */
+#define UIP_SAVE_LAST_ICMP_ECHO_TIME UIP_CONF_SAVE_LAST_ICMP_ECHO_TIME
+#endif
+
 
 /**
  * Determines if logging of certain events should be compiled in.

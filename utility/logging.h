@@ -23,6 +23,7 @@
 
 #warning "You can configure LogObject and ACTLOGLEVEL in 'utility/logging.h'. More verbosity more memory usage."
 #define ACTLOGLEVEL     LOG_NONE
+// #define ACTLOGLEVEL		LOG_DEBUG_V1
 //#define ACTLOGLEVEL LOG_WARNING
 //#define ACTLOGLEVEL LOG_INFO
 //#define ACTLOGLEVEL LOG_DEBUG_V2

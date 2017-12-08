@@ -82,7 +82,11 @@ UIPEthernetClass::begin(const uint8_t* mac, char * hostname)
   // Now try to get our config info from a DHCP server
   int ret = 0;
   if (hostname != NULL) {
-    ret = _dhcp->beginWithDHCP((uint8_t*)mac, hostname);
+#if UIP_ASYNC_DHCP
+	  ret = _dhcp->beginWithDHCPAsync((uint8_t*)mac, hostname);
+#else
+	  ret = _dhcp->beginWithDHCP((uint8_t*)mac, hostname);
+#endif
   } else {
     ret = _dhcp->beginWithDHCP((uint8_t*)mac);
   }
@@ -94,8 +98,16 @@ UIPEthernetClass::begin(const uint8_t* mac, char * hostname)
   }
   return ret;
 }
-
-
+#if UIP_ASYNC_DHCP
+int UIPEthernetClass::checkDHCPInit() {
+	int r = _dhcp->pollDHCPAsync();
+	if (r > 0) {
+		configure(_dhcp->getLocalIp(),_dhcp->getDnsServerIp(),_dhcp->getGatewayIp(),_dhcp->getSubnetMask());
+		return 1;
+	}
+	return r;
+}
+#endif
 
 #endif
 
@@ -149,24 +161,41 @@ int UIPEthernetClass::maintain(){
   int rc = DHCP_CHECK_NONE;
 #if UIP_UDP
   if(_dhcp != NULL){
-    //we have a pointer to dhcp, use it
-    rc = _dhcp->checkLease();
-    switch ( rc ){
-      case DHCP_CHECK_NONE:
-        //nothing done
-        break;
-      case DHCP_CHECK_RENEW_OK:
-      case DHCP_CHECK_REBIND_OK:
-        //we might have got a new IP.
-        configure(_dhcp->getLocalIp(),_dhcp->getDnsServerIp(),_dhcp->getGatewayIp(),_dhcp->getSubnetMask());
-        break;
-      default:
-        //this is actually a error, it will retry though
-        break;
-    }
+	  #if UIP_ASYNC_DHCP
+		rc = _dhcp->checkLease_async();
+		switch ( rc ){
+		  case DHCP_CHECK_NONE:
+			//nothing done
+			break;
+		  case DHCP_CHECK_RENEW_OK:
+		  case DHCP_CHECK_REBIND_OK:
+			//we might have got a new IP.
+			configure(_dhcp->getLocalIp(),_dhcp->getDnsServerIp(),_dhcp->getGatewayIp(),_dhcp->getSubnetMask());
+			break;
+		  default:
+			//this is actually a error, it will retry though
+			break;
+		}
+	  #else
+		//we have a pointer to dhcp, use it
+		rc = _dhcp->checkLease();
+		switch ( rc ){
+		  case DHCP_CHECK_NONE:
+			//nothing done
+			break;
+		  case DHCP_CHECK_RENEW_OK:
+		  case DHCP_CHECK_REBIND_OK:
+			//we might have got a new IP.
+			configure(_dhcp->getLocalIp(),_dhcp->getDnsServerIp(),_dhcp->getGatewayIp(),_dhcp->getSubnetMask());
+			break;
+		  default:
+			//this is actually a error, it will retry though
+			break;
+		}
+	#endif
   }
-  return rc;
 #endif
+  return rc;
 }
 
 IPAddress UIPEthernetClass::localIP()

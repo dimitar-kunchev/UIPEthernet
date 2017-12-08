@@ -1298,6 +1298,10 @@ struct uip_stats {
 #endif /* UIP_UDP */
 };
 
+#if UIP_SAVE_LAST_ICMP_ECHO_TIME == 1
+unsigned long uip_get_last_icmp_echo_time();
+#endif
+
 /**
  * The uIP TCP/IP statistics.
  *
