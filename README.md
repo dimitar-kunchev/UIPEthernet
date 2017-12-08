@@ -5,16 +5,15 @@ Original UIPEthernet writed by Norbert Truchsess.
 
 You can find wiring diagram for more board in the hardware directory.
 
-Modifications made after forking from UIPEthernet repository are aimed at making the library more asynchronous. That includes
+Modifications made after forking from UIPEthernet repository are aimed at making the library more asynchronous. That includes:
 - Improvements to the support for ATSAMD 
 - Added non-blocking tcp connect in (UIPClientExt.cpp) - not written by me
 - Added non-blocking DNS request in a new DnsNB class
 - Added non-blocking DHCP support in the Dhcp class. This is linked with a compile option UIP_CONFG_ASYNC_DHCP in utility/uip-conf.h file. Disabling it should revert the changes.
 - Added support for tracking the last time we were pinged. Disable via UIP_CONF_SAVE_LAST_ICMP_ECHO_TIME in utility/uip-conf.h. Check using uip_get_last_icmp_echo_time(). Tracked using  millis() so time intervals and overflow handling are up to the user
-These modifications are highly experimental, written in a rather ugly fashion and I am testing them only on ATSAMD. But should work...
-Examples to the modifications are not available yet 
+These modifications are highly experimental, written in a rather ugly fashion and I am testing them only on ATSAMD. But should work. Examples on how to use these modifications are not available yet.
 
-Modifications:
+Original Modifications:
 - Replaced import to include, because gcc say 'import is deprecated'.
 - Added support for STM32F, and ESP8266 MCU-s.
 - Merged martinayotte's modification (Correct s_dhcp ~40K more memory usage with STM32F MCU-s.)
