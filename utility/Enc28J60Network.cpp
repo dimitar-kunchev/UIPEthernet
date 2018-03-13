@@ -150,7 +150,7 @@ void Enc28J60Network::init(uint8_t* macaddr)
   #elif defined(ARDUINO_ARCH_SAMD)
     // SAMD-specific code
     // Should we set clock divider?
-    SPI.setClockDivider(10);
+    // SPI.setClockDivider(10);
   #elif defined(__STM32F1__) || defined(__STM32F3__)
     // generic, non-platform specific code
     #define USE_STM32F1_DMAC 1 //on STM32
@@ -457,6 +457,9 @@ Enc28J60Network::sendPacket(memhandle handle)
       {
       LogObject.uart_send_hex(readByte(i));
       LogObject.uart_send_str(F(" "));
+      if ((i - start) % 32 == 31) {
+    	  LogObject.uart_send_strln();
+      }
       }
     LogObject.uart_send_strln(F(""));
   #endif
@@ -662,6 +665,9 @@ uint8_t Enc28J60Network::readByte(uint16_t addr)
 
   CSACTIVE;
   #if ENC28J60_USE_SPILIB
+    #if defined(ARDUINO_ARCH_SAMD)
+      SPI.beginTransaction(SPISettings(ENC28J60_SPI_FREQ, MSBFIRST, SPI_MODE0));
+    #endif
     // issue read command
     #if defined(ARDUINO)
       SPI.transfer(ENC28J60_READ_BUF_MEM);
@@ -672,6 +678,9 @@ uint8_t Enc28J60Network::readByte(uint16_t addr)
       _spi.write(ENC28J60_READ_BUF_MEM);
       // read data
       uint8_t c = _spi.write(0x00);
+    #endif
+    #if defined(ARDUINO_ARCH_SAMD)
+      SPI.endTransaction();
     #endif
     CSPASSIVE;
     return (c);
@@ -699,6 +708,9 @@ void Enc28J60Network::writeByte(uint16_t addr, uint8_t data)
 
   CSACTIVE;
   #if ENC28J60_USE_SPILIB
+    #if defined(ARDUINO_ARCH_SAMD)
+      SPI.beginTransaction(SPISettings(ENC28J60_SPI_FREQ, MSBFIRST, SPI_MODE0));
+    #endif
     // issue write command
     #if defined(ARDUINO)
       SPI.transfer(ENC28J60_WRITE_BUF_MEM);
@@ -709,6 +721,9 @@ void Enc28J60Network::writeByte(uint16_t addr, uint8_t data)
       _spi.write(ENC28J60_WRITE_BUF_MEM);
       // write data
       _spi.write(data);
+    #endif
+    #if defined(ARDUINO_ARCH_SAMD)
+      SPI.endTransaction();
     #endif
   #else
     // issue write command
@@ -812,6 +827,9 @@ Enc28J60Network::readOp(uint8_t op, uint8_t address)
   CSACTIVE;
   // issue read command
   #if ENC28J60_USE_SPILIB
+    #if defined(ARDUINO_ARCH_SAMD)
+      SPI.beginTransaction(SPISettings(ENC28J60_SPI_FREQ, MSBFIRST, SPI_MODE0));
+    #endif
     #if defined(ARDUINO)
       SPI.transfer(op | (address & ADDR_MASK));
       // read data
@@ -831,6 +849,9 @@ Enc28J60Network::readOp(uint8_t op, uint8_t address)
         _spi.write(0x00);
         }
       uint8_t c = _spi.write(0x00);
+    #endif
+    #if defined(ARDUINO_ARCH_SAMD)
+      SPI.endTransaction();
     #endif
     // release CS
     CSPASSIVE;
@@ -866,6 +887,9 @@ Enc28J60Network::writeOp(uint8_t op, uint8_t address, uint8_t data)
   CSACTIVE;
   // issue write command
   #if ENC28J60_USE_SPILIB
+    #if defined(ARDUINO_ARCH_SAMD)
+      SPI.beginTransaction(SPISettings(ENC28J60_SPI_FREQ, MSBFIRST, SPI_MODE0));
+    #endif
     #if defined(ARDUINO)
       SPI.transfer(op | (address & ADDR_MASK));
       // write data
@@ -876,6 +900,9 @@ Enc28J60Network::writeOp(uint8_t op, uint8_t address, uint8_t data)
       // write data
       _spi.write(data);
     #endif
+	#if defined(ARDUINO_ARCH_SAMD)
+	  SPI.endTransaction();
+	#endif
   #else
     // issue write command
     SPDR = op | (address & ADDR_MASK);
@@ -897,6 +924,9 @@ Enc28J60Network::readBuffer(uint16_t len, uint8_t* data)
     LogObject.uart_send_strln(F("Enc28J60Network::readBuffer(uint16_t len, uint8_t* data) DEBUG_V3:Function started"));
   #endif
   CSACTIVE;
+  #if defined(ARDUINO_ARCH_SAMD)
+    SPI.beginTransaction(SPISettings(ENC28J60_SPI_FREQ, MSBFIRST, SPI_MODE0));
+  #endif
   // issue read command
   #if ENC28J60_USE_SPILIB  
     #if defined(ARDUINO)
@@ -929,6 +959,9 @@ Enc28J60Network::readBuffer(uint16_t len, uint8_t* data)
     }
   //*data='\0';
   CSPASSIVE;
+  #if defined(ARDUINO_ARCH_SAMD)
+    SPI.endTransaction();
+  #endif
 }
 
 void
@@ -938,6 +971,9 @@ Enc28J60Network::writeBuffer(uint16_t len, uint8_t* data)
     LogObject.uart_send_strln(F("Enc28J60Network::writeBuffer(uint16_t len, uint8_t* data) DEBUG_V3:Function started"));
   #endif
   CSACTIVE;
+  #if defined(ARDUINO_ARCH_SAMD)
+    SPI.beginTransaction(SPISettings(ENC28J60_SPI_FREQ, MSBFIRST, SPI_MODE0));
+  #endif
   // issue write command
   #if ENC28J60_USE_SPILIB  
     #if defined(ARDUINO)
@@ -969,6 +1005,9 @@ Enc28J60Network::writeBuffer(uint16_t len, uint8_t* data)
     #endif
     }
   CSPASSIVE;
+  #if defined(ARDUINO_ARCH_SAMD)
+    SPI.endTransaction();
+  #endif
 }
 
 void
@@ -1099,6 +1138,9 @@ Enc28J60Network::chksum(uint16_t sum, memhandle handle, memaddress pos, uint16_t
   uint16_t t;
   len = setReadPtr(handle, pos, len)-1;
   CSACTIVE;
+  #if defined(ARDUINO_ARCH_SAMD)
+    SPI.beginTransaction(SPISettings(ENC28J60_SPI_FREQ, MSBFIRST, SPI_MODE0));
+  #endif
   // issue read command
   #if ENC28J60_USE_SPILIB
     #if defined(ARDUINO)
@@ -1159,6 +1201,10 @@ Enc28J60Network::chksum(uint16_t sum, memhandle handle, memaddress pos, uint16_t
       }
     }
   CSPASSIVE;
+
+  #if defined(ARDUINO_ARCH_SAMD)
+    SPI.endTransaction();
+  #endif
 
   /* Return sum in host byte order. */
   return sum;

@@ -104,7 +104,7 @@
    #elif defined(__MK20DX128__) || defined(__MKL26Z64__) || defined(__MK20DX256__) || defined(__MK64FX512__) || defined(__MK66FX1M0__)
       #define ENC28J60_CONTROL_CS     PIN_SPI_SS
    #endif
-   #if defined(ENC28J60_CONTROL_CS)
+   #if !defined(ENC28J60_CONTROL_CS)
       #warning "Not defined ENC28J60_CONTROL_CS. Use borad default SS pin setting. You can configure in 'utility/Enc28J60Network.h'."
    #endif
 #endif
@@ -193,6 +193,10 @@
       #include <SPI.h>
    #endif
    #define ENC28J60_USE_SPILIB 1
+#endif
+
+#if defined(ARDUINO_ARCH_SAMD)
+	#define ENC28J60_SPI_FREQ 4000000
 #endif
 
 #define UIP_RECEIVEBUFFERHANDLE 0xff
