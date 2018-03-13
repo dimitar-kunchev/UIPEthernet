@@ -52,7 +52,7 @@ int DhcpClass::beginWithDHCP(uint8_t *mac, char * hostname)
 	if (_hostname != NULL) {
 		free(_hostname);
 	}
-	_hostname = (char *)malloc(strlen(hostname) + 1);
+	_hostname = (char *)malloc(strlen(hostname)+1);
 	strcpy(_hostname, hostname);
 
     // zero out _dhcpMacAddr
@@ -206,7 +206,7 @@ void DhcpClass::send_DHCP_MESSAGE(uint8_t messageType, uint16_t secondsElapsed)
     #if ACTLOGLEVEL>=LOG_DEBUG_V1
       LogObject.uart_send_strln(F("DhcpClass::send_DHCP_MESSAGE(uint8_t messageType, uint16_t secondsElapsed) DEBUG_V1:Function started"));
     #endif
-	uint8_t buffer_length = 18 + strlen(_hostname) + 2; // 2 extra bytes for good measure. The original code used 30 bytes but allocated 32...
+	uint8_t buffer_length = max(32, 18 + strlen(_hostname) + 2); // 2 extra bytes for good measure. The original code used 30 bytes but allocated 32...
     uint8_t buffer[buffer_length];
     memset(buffer, 0, buffer_length);
     IPAddress dest_addr( 255, 255, 255, 255 ); // Broadcast address
@@ -302,7 +302,7 @@ void DhcpClass::send_DHCP_MESSAGE(uint8_t messageType, uint16_t secondsElapsed)
         //put data in W5100 transmit buffer
         _dhcpUdpSocket.write(buffer, 12);
     }
-    
+    // memset(buffer, 0, buffer_length);   
     buffer[0] = dhcpParamRequest;
     buffer[1] = 0x06;
     buffer[2] = subnetMask;
@@ -662,6 +662,9 @@ int DhcpClass::pollDHCPAsync(void){
 	}
 	else if(_dhcp_state == STATE_DHCP_DISCOVER)
 	{
+		#if ACTLOGLEVEL>=LOG_DEBUG_V1
+		  LogObject.uart_send_strln(F("DhcpClass::pollDHCPAsync(void) DEBUG_V1:dhcp_state=STATE_DHCP_DISCOVER -> check response available"));
+		#endif
 		uint32_t respId;
 		int ra = check_async_response_available();
 		if (ra == 1) {
