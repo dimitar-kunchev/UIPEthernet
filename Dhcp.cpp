@@ -209,6 +209,7 @@ void DhcpClass::send_DHCP_MESSAGE(uint8_t messageType, uint16_t secondsElapsed)
 	uint8_t buffer_length = max(32, 18 + strlen(_hostname) + 2); // 2 extra bytes for good measure. The original code used 30 bytes but allocated 32...
     uint8_t buffer[buffer_length];
     memset(buffer, 0, buffer_length);
+    /// @TODO: Actually if we are already bound to a DHCP server we should send the packet directly to that instead of always broadcasting them!
     IPAddress dest_addr( 255, 255, 255, 255 ); // Broadcast address
 
     if (-1 == _dhcpUdpSocket.beginPacket(dest_addr, DHCP_SERVER_PORT))
@@ -409,7 +410,7 @@ uint8_t DhcpClass::parseDHCPResponse(uint32_t& transactionId, bool async)
                     }
                     else
                     {
-                        // Skip over the rest of this option
+                    	// Skip over the rest of this option
                         while (opt_len--)
                         {
                             _dhcpUdpSocket.read();
@@ -647,6 +648,12 @@ int DhcpClass::pollDHCPAsync(void){
 		#endif
 		_dhcpTransactionId++;
 
+		// if we are sending a discover message we should reset the IP of the server we might have been bound to. Otherwise if the IP of the DHCP has changed
+		// the response will be ignored, because it does not match. We will eventually time out but that takes a few minutes and is not really needed
+		_dhcpipv4struct.DhcpServerIp[0] = 0;
+		_dhcpipv4struct.DhcpServerIp[1] = 0;
+		_dhcpipv4struct.DhcpServerIp[2] = 0;
+		_dhcpipv4struct.DhcpServerIp[3] = 0;
 		send_DHCP_MESSAGE(DHCP_DISCOVER, ((millis() - _ra_startTime) / 1000));
 		_dhcp_state = STATE_DHCP_DISCOVER;
 		_ra_dhcp_request_startTime = millis();
@@ -742,9 +749,23 @@ int DhcpClass::pollDHCPAsync(void){
 	}
 
 	if(result != 1 && ((millis() - _ra_startTime) > DHCP_TIMEOUT)) {
-		// end the async process and return appropriate error
+		#if ACTLOGLEVEL>=LOG_DEBUG_V1
+		  LogObject.uart_send_strln(F("DhcpClass::pollDHCPAsync(void) DEBUG_V1:DHCP_TIMEOUT reached, restarting"));
+		#endif
+
+		// reset the state and try again. We could add some timeout timer here really...
+
+		_dhcp_state = STATE_DHCP_START;
+		_dhcpLeaseTime=0;
+		_dhcpT1=0;
+		_dhcpT2=0;
+		_lastCheck=0;
+
 		request_DHCP_lease_async_end();
-		return -1;
+		reset_DHCP_lease();
+		request_DHCP_lease();
+
+		return -1; // should we return an error if we reset and try again foreger?
 	}
 
 	#if defined(ESP8266)
