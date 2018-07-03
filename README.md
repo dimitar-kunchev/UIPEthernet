@@ -12,6 +12,7 @@ Modifications made after forking from UIPEthernet repository are aimed at making
 - Added non-blocking DHCP support in the Dhcp class. This is linked with a compile option UIP_CONFG_ASYNC_DHCP in utility/uip-conf.h file. Disabling it should revert the changes.
 - Added support for tracking the last time we were pinged. Disable via UIP_CONF_SAVE_LAST_ICMP_ECHO_TIME in utility/uip-conf.h. Check using uip_get_last_icmp_echo_time(). Tracked using  millis() so time intervals and overflow handling are up to the user
 These modifications are highly experimental, written in a rather ugly fashion and I am testing them only on ATSAMD. But should work. Examples on how to use these modifications are not available yet.
+- Improved ARP table - entries are not always added on every IP packet
 
 Original Modifications:
 - Replaced import to include, because gcc say 'import is deprecated'.
