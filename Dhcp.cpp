@@ -763,7 +763,7 @@ int DhcpClass::pollDHCPAsync(void){
 
 		request_DHCP_lease_async_end();
 		reset_DHCP_lease();
-		request_DHCP_lease();
+		// request_DHCP_lease();
 
 		return -1; // should we return an error if we reset and try again foreger?
 	}
